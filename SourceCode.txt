@@ -1,0 +1,810 @@
+python flask code of sciencebot:
+from chatterbot import ChatBot
+from chatterbot.trainers import ListTrainer
+from chatterbot.logic import LogicAdapter
+from chatterbot.conversation import Statement
+from flask import Flask, json, render_template, request, jsonify, redirect, url_for, session
+import random
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Change this to a more secure secret key
+
+class IntentAdapter(LogicAdapter):
+
+    def can_process(self, statement):
+        # The intent adapter can process any input
+        return True
+
+    def process(self, input_statement, additional_response_selection_parameters):
+        response = None
+        for intent_data in training_data:
+            if input_statement.text.lower() in intent_data['patterns']:
+                response = random.choice(intent_data['responses'])
+                break
+        
+        if not response:
+            response = "Sorry, I don't have an answer."
+
+        statement = Statement(response)
+        statement.confidence = 1
+
+        return statement
+
+
+
+bot = ChatBot(
+    "chatbot",
+    read_only=False,
+    logic_adapters=[
+        {
+            "import_path": "chatterbot.logic.BestMatch",
+            "default_response": "Sorry, I don't have an answer.",
+            "maximum_similarity_threshold": 0.90,
+        },
+        {
+            "import_path": "chatterbot.logic.MathematicalEvaluation"
+        },
+        {
+            "import_path": "chatterbot.logic.UnitConversion"
+        },
+        {
+            "import_path": "__main__.IntentAdapter"
+        }
+    ],
+)
+
+
+# Load the JSON data from a file
+with open('training_data.json', 'r') as file:
+    training_data = json.load(file)
+
+# Now, training_data is a list containing all the intents, patterns, and responses
+# You can access individual intents and their corresponding data like this:
+for intent_data in training_data:
+    intent = intent_data['intent']
+    patterns = intent_data['patterns']
+    responses = intent_data['responses']
+    
+@app.route("/")
+def main():
+    if 'username' in session:
+        return render_template("demo5.html")
+    return redirect(url_for('login'))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        session.pop('username', None)
+
+        if request.form['password'] == 'password':  # Replace 'password' with your actual password
+            session['username'] = request.form['username']
+            return redirect(url_for('main'))
+
+        return render_template('login.html', error='Invalid username or password')
+
+    return render_template('login.html')
+
+@app.route("/logout")
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
+@app.route("/get_response", methods=["POST"])
+def get_response():
+    if 'username' not in session:
+        return jsonify({"bot_response": "Please login to use the chatbot."})
+
+    user_message = request.form["user_message"]
+
+    # Check if the user wants to end the chat
+    if user_message.lower() == 'exit':
+        return jsonify({"bot_response": "Chat Ended...."})
+
+    # Create a Statement object with search_text attribute set
+    statement = Statement(user_message)
+    statement.search_text = user_message
+
+    bot_response = str(bot.get_response(statement))
+
+    return jsonify({"bot_response": bot_response})
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+HTML,CSS and JAVASCRIPT CODE of ScienceBot:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .chat-box {
+            height: 400px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            float: right;
+            clear: both;
+            margin-bottom: 10px;
+        }
+        .bot-message {
+            background-color: #28a745;
+            color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            float: left;
+            clear: both;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            width: calc(100% - 70px);
+            padding: 10px;
+            border-radius: 5px 0 0 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            width: 70px;
+            padding: 10px;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+        #logout-btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #dc3545;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Chatbot</h1>
+    <div class="chat-box" id="chatBox">
+        <div class="bot-message">Hello! How can I help you today?</div>
+    </div>
+    <div>
+        <input type="text" id="userInput" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+        <button id="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<script>
+    function sendMessage() {
+        var userInput = document.getElementById('userInput');
+        var userMessage = userInput.value;
+        if (userMessage.trim() === '') {
+            return;
+        }
+
+        // Add user message to chat box
+        $('#chatBox').append('<div class="user-message">' + userMessage + '</div>');
+        userInput.value = '';
+
+        // Send message to server
+        $.ajax({
+            url: '/get_response',
+            type: 'POST',
+            data: { user_message: userMessage },
+            success: function(response) {
+                var botMessage = response.bot_response;
+                $('#chatBox').append('<div class="bot-message">' + botMessage + '</div>');
+                // Scroll to bottom of chat box
+                $('#chatBox').scrollTop($('#chatBox')[0].scrollHeight);
+            }
+        });
+    }
+
+    function logout() {
+        $.ajax({
+            url: '/logout',
+            type: 'GET',
+            success: function() {
+                window.location.href = "/login";
+            }
+        });
+    }
+
+    // Send message on pressing Enter
+    $('#userInput').keypress(function(event) {
+        if (event.which === 13) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+</script>
+
+</body>
+</html>
+    
+Login Code:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;  /* Changed background color */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+
+        p {
+            color: red;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Login</h1>
+    {% if error %}
+    <p>{{ error }}</p>
+    {% endif %}
+    <form action="{{ url_for('login') }}" method="post">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <br>
+        <input type="submit" value="Login">
+    </form>
+</body>
+</html>
+
+
+PUZZLEBOT Python Flask code:
+
+from chatterbot import ChatBot
+from chatterbot.trainers import ListTrainer
+from chatterbot.logic import LogicAdapter
+from chatterbot.conversation import Statement
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+import random
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Change this to a more secure secret key
+
+class PuzzleAdapter(LogicAdapter):
+    def can_process(self, statement):
+        return True
+
+    def process(self, input_statement, additional_response_selection_parameters):
+        response = None
+        for puzzle_data in puzzle_data_list:
+            if input_statement.text.lower() in puzzle_data['questions']:
+                response = random.choice(puzzle_data['responses'])
+                break
+
+        if not response:
+            response = self.bot.storage.get_random()
+
+        statement = Statement(response)
+        statement.confidence = 1
+
+        return statement
+
+bot = ChatBot(
+    "puzzle_bot",
+    read_only=False,
+    logic_adapters=[
+        {
+            "import_path": "chatterbot.logic.BestMatch",
+            "default_response": "Sorry, I don't have an answer.",
+            "maximum_similarity_threshold": 0.90,
+        },
+        {
+            "import_path": "__main__.PuzzleAdapter"
+        }
+    ],
+)
+
+puzzle_data_list = [
+    {
+        "questions": ["what has keys but can't open locks?", "key"],
+        "responses": ["Correct! The answer is key.", "You got it! The answer is key.", "Well done! The answer is key."],
+        "hint": "It is something you might use to play a musical instrument.",
+        "clue_given": False
+    },
+    {
+        "questions": ["what comes once in a minute, twice in a moment, but never in a thousand years?", "m"],
+        "responses": ["Correct! The answer is m.", "You got it! The answer is m.", "Well done! The answer is m."],
+        "hint": "It's a letter of the alphabet.",
+        "clue_given": False
+    },
+    {
+        "questions": ["what is full of holes but still holds water?", "sponge"],
+        "responses": ["Correct! The answer is sponge.", "You got it! The answer is sponge.", "Well done! The answer is sponge."],
+        "hint": "It's something you might use in the shower.",
+        "clue_given": False
+    },
+    {
+        "questions": ["what has a head, a tail, but no body?", "coin"],
+        "responses": ["Correct! The answer is coin.", "You got it! The answer is coin.", "Well done! The answer is coin."],
+        "hint": "It's something you might find in your pocket.",
+        "clue_given": False
+    },
+    {
+        "questions": ["I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?", "echo"],
+        "responses": ["Correct! The answer is echo.", "You got it! The answer is echo.", "Well done! The answer is echo."],
+        "hint": "It's something you might hear in a canyon.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has a neck but no head?", "bottle"],
+        "responses": ["Correct! The answer is bottle.", "You got it! The answer is bottle.", "Well done! The answer is bottle."],
+        "hint": "It's commonly used to hold beverages.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has to be broken before you can use it?", "egg"],
+        "responses": ["Correct! The answer is egg.", "You got it! The answer is egg.", "Well done! The answer is egg."],
+        "hint": "It's a common breakfast food.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What goes up but never comes down?", "age"],
+        "responses": ["Correct! The answer is age.", "You got it! The answer is age.", "Well done! The answer is age."],
+        "hint": "It's something that increases over time.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has many keys but can't open a single lock?", "piano"],
+        "responses": ["Correct! The answer is piano.", "You got it! The answer is piano.", "Well done! The answer is piano."],
+        "hint": "It's a musical instrument.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What is always in front of you but can't be seen?", "future"],
+        "responses": ["Correct! The answer is future.", "You got it! The answer is future.", "Well done! The answer is future."],
+        "hint": "It's something that hasn't happened yet.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has hands but cannot clap?", "clock"],
+        "responses": ["Correct! The answer is clock.", "You got it! The answer is clock.", "Well done! The answer is clock."],
+        "hint": "It's used to tell time.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has one eye but can't see?", "needle"],
+        "responses": ["Correct! The answer is needle.", "You got it! The answer is needle.", "Well done! The answer is needle."],
+        "hint": "It's used for sewing.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What is so delicate that saying its name breaks it?", "silence"],
+        "responses": ["Correct! The answer is silence.", "You got it! The answer is silence.", "Well done! The answer is silence."],
+        "hint": "It's the absence of sound.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has a head, a tail, is brown, and has no legs?", "penny"],
+        "responses": ["Correct! The answer is penny.", "You got it! The answer is penny.", "Well done! The answer is penny."],
+        "hint": "It's a type of coin.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What can you catch but not throw?", "cold"],
+        "responses": ["Correct! The answer is cold.", "You got it! The answer is cold.", "Well done! The answer is cold."],
+        "hint": "It's a common illness.",
+        "clue_given": False
+    },
+    {
+        "questions": ["The more you take, the more you leave behind. What am I?", "footsteps"],
+        "responses": ["Correct! The answer is footsteps.", "You got it! The answer is footsteps.", "Well done! The answer is footsteps."],
+        "hint": "It's left behind when you walk.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What can travel around the world while staying in a corner?", "stamp"],
+        "responses": ["Correct! The answer is stamp.", "You got it! The answer is stamp.", "Well done! The answer is stamp."],
+        "hint": "It's used to send mail.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What belongs to you but is used more by others?", "name"],
+        "responses": ["Correct! The answer is name.", "You got it! The answer is name.", "Well done! The answer is name."],
+        "hint": "It's something people call you by.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has a head, a tail, is brown, and has no legs?", "penny"],
+        "responses": ["Correct! The answer is penny.", "You got it! The answer is penny.", "Well done! The answer is penny."],
+        "hint": "It's a form of currency.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What can you break, even if you never pick it up or touch it?", "promise"],
+        "responses": ["Correct! The answer is promise.", "You got it! The answer is promise.", "Well done! The answer is promise."],
+        "hint": "It's something you make to someone.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What gets wetter as it dries?", "towel"],
+        "responses": ["Correct! The answer is towel.", "You got it! The answer is towel.", "Well done! The answer is towel."],
+        "hint": "It's used to dry yourself after a shower.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What can you hold in your right hand, but never in your left hand?", "left hand"],
+        "responses": ["Correct! The answer is left hand.", "You got it! The answer is left hand.", "Well done! The answer is left hand."],
+        "hint": "It's a body part.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What comes once in a year, twice in a month, but never in a week?", "e"],
+        "responses": ["Correct! The answer is e.", "You got it! The answer is e.", "Well done! The answer is e."],
+        "hint": "It's a letter of the alphabet.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has one eye but cannot see?", "needle"],
+        "responses": ["Correct! The answer is needle.", "You got it! The answer is needle.", "Well done! The answer is needle."],
+        "hint": "It's used for sewing.",
+        "clue_given": False
+    },
+    {
+        "questions": ["I'm tall when I'm young, and I'm short when I'm old. What am I?", "candle"],
+        "responses": ["Correct! The answer is candle.", "You got it! The answer is candle.", "Well done! The answer is candle."],
+        "hint": "It's something that can be lit.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has to be broken before you can use it?", "egg"],
+        "responses": ["Correct! The answer is egg.", "You got it! The answer is egg.", "Well done! The answer is egg."],
+        "hint": "It's a common breakfast item.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has keys but can't open locks?", "keyboard"],
+        "responses": ["Correct! The answer is keyboard.", "You got it! The answer is keyboard.", "Well done! The answer is keyboard."],
+        "hint": "It's something you use to type on a computer.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What gets wet while drying?", "towel"],
+        "responses": ["Correct! The answer is towel.", "You got it! The answer is towel.", "Well done! The answer is towel."],
+        "hint": "It's something you use to dry off after a shower.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has a bottom at the top?", "legs"],
+        "responses": ["Correct! The answer is legs.", "You got it! The answer is legs.", "Well done! The answer is legs."],
+        "hint": "They help you move around.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has a head and a tail but no body?", "coin"],
+        "responses": ["Correct! The answer is coin.", "You got it! The answer is coin.", "Well done! The answer is coin."],
+        "hint": "It's used as money.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What is full of holes but still holds water?", "sponge"],
+        "responses": ["Correct! The answer is sponge.", "You got it! The answer is sponge.", "Well done! The answer is sponge."],
+        "hint": "It's used for cleaning.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What can you break, even if you never pick it up or touch it?", "promise"],
+        "responses": ["Correct! The answer is promise.", "You got it! The answer is promise.", "Well done! The answer is promise."],
+        "hint": "It's something you give to someone.",
+        "clue_given": False
+    },
+    {
+        "questions": ["I'm light as a feather, yet the strongest man can't hold me for much longer than a minute. What am I?", "breath"],
+        "responses": ["Correct! The answer is breath.", "You got it! The answer is breath.", "Well done! The answer is breath."],
+        "hint": "It's something you do without thinking.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has to be broken before you can use it?", "egg"],
+        "responses": ["Correct! The answer is egg.", "You got it! The answer is egg.", "Well done! The answer is egg."],
+        "hint": "It's a common breakfast item.",
+        "clue_given": False
+    },
+    {
+        "questions": ["What has keys but can't open locks?", "keyboard"],
+        "responses": ["Correct! The answer is keyboard.", "You got it! The answer is keyboard.", "Well done! The answer is keyboard."],
+        "hint": "It's something you use to type on a computer.",
+        "clue_given": False
+    }
+]
+
+list_trainer = ListTrainer(bot)
+
+for item in puzzle_data_list:
+    questions = item["questions"]
+    responses = item["responses"]
+    list_trainer.train(questions)
+    list_trainer.train(responses)
+
+user_answer = None
+current_question = None
+
+@app.route("/")
+def main():
+    global current_question
+    if 'username' in session:
+        current_question = random.choice(puzzle_data_list)
+        return render_template("puzzle_demo.html", question=current_question['questions'][0])
+    return redirect(url_for('login'))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        session.pop('username', None)
+
+        if request.form['password'] == 'password':
+            session['username'] = request.form['username']
+            return redirect(url_for('main'))
+
+        return render_template('login.html', error='Invalid username or password')
+
+    return render_template('login.html')
+
+@app.route("/logout")
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+@app.route("/get_response", methods=["POST"])
+def get_response():
+    global user_answer, current_question
+
+    if 'username' not in session:
+        return jsonify({"bot_response": "Please login to use the chatbot."})
+
+    user_message = request.form["user_message"]
+
+    if user_answer is None:
+        user_answer = user_message.lower()
+        if user_answer == current_question['questions'][1]:
+            bot_response = str(random.choice(current_question['responses']))
+            puzzle_data_list.remove(current_question)
+            if puzzle_data_list:
+                current_question = random.choice(puzzle_data_list)
+            else:
+                current_question = None
+        else:
+            current_question['clue_given'] = False
+            bot_response = "Try again!"
+
+    else:
+        if user_message.lower() == current_question['questions'][1]:
+            bot_response = str(random.choice(current_question['responses']))
+            puzzle_data_list.remove(current_question)
+            if puzzle_data_list:
+                current_question = random.choice(puzzle_data_list)
+            else:
+                current_question = None
+            user_answer = None
+        else:
+            if not current_question['clue_given']:
+                bot_response = current_question['hint']
+                current_question['clue_given'] = True
+            else:
+                bot_response = "Sorry, that's incorrect. The answer is " + current_question['questions'][1]
+
+    if current_question:
+        return jsonify({"bot_response": bot_response, "question": current_question['questions'][0]})
+    else:
+        return jsonify({"bot_response": "You have completed all the puzzles!", "question": ""})
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+PUZZZLEBOT HTML,CSS and JAVASCRIPT Code:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle Chatbot</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .chat-box {
+            height: 300px; /* Adjusted height */
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            float: right;
+            clear: both;
+            margin-bottom: 10px;
+        }
+        .bot-message {
+            background-color: #28a745;
+            color: #333;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            float: left;
+            clear: both;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            width: calc(100% - 80px);
+            padding: 10px;
+            border-radius: 5px 0 0 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            width: 70px;
+            padding: 10px;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+        .logout-btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #dc3545;
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Puzzle Chatbot</h1>
+    <div class="chat-box" id="chatBox">
+        <div class="bot-message">Let's start with a puzzle! <strong>{{ question }}</strong></div>
+    </div>
+    <div>
+        <input type="text" id="userInput" placeholder="Type your answer...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+    <button class="logout-btn" onclick="logout()">Logout</button> <!-- Logout button -->
+</div>
+
+<script>
+    function sendMessage() {
+        var userInput = document.getElementById('userInput');
+        var userMessage = userInput.value;
+        if (userMessage.trim() === '') {
+            return;
+        }
+
+        $('#chatBox').append('<div class="user-message">' + userMessage + '</div>');
+        userInput.value = '';
+
+        $.ajax({
+            url: '/get_response',
+            type: 'POST',
+            data: { user_message: userMessage },
+            success: function(response) {
+                var botMessage = response.bot_response;
+                var newQuestion = response.question;
+                $('#chatBox').append('<div class="bot-message">' + botMessage + '</div>');
+                if (newQuestion) {
+                    $('#chatBox').append('<div class="bot-message">Next question: <strong>' + newQuestion + '</strong></div>');
+                }
+                $('#chatBox').scrollTop($('#chatBox')[0].scrollHeight);
+            }
+        });
+    }
+
+    $('#userInput').keypress(function(event) {
+        if (event.which === 13) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+
+    function logout() {
+        window.location.href = '/logout';
+    }
+</script>
+
+</body>
+</html>
