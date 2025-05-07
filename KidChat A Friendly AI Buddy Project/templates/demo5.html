@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .chat-box {
+            height: 400px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            float: right;
+            clear: both;
+            margin-bottom: 10px;
+        }
+        .bot-message {
+            background-color: #28a745;
+            color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            float: left;
+            clear: both;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            width: calc(100% - 70px);
+            padding: 10px;
+            border-radius: 5px 0 0 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            width: 70px;
+            padding: 10px;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+        #logout-btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #dc3545;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Chatbot</h1>
+    <div class="chat-box" id="chatBox">
+        <div class="bot-message">Hello! How can I help you today?</div>
+    </div>
+    <div>
+        <input type="text" id="userInput" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+        <button id="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<script>
+    function sendMessage() {
+        var userInput = document.getElementById('userInput');
+        var userMessage = userInput.value;
+        if (userMessage.trim() === '') {
+            return;
+        }
+
+        // Add user message to chat box
+        $('#chatBox').append('<div class="user-message">' + userMessage + '</div>');
+        userInput.value = '';
+
+        // Send message to server
+        $.ajax({
+            url: '/get_response',
+            type: 'POST',
+            data: { user_message: userMessage },
+            success: function(response) {
+                var botMessage = response.bot_response;
+                $('#chatBox').append('<div class="bot-message">' + botMessage + '</div>');
+                // Scroll to bottom of chat box
+                $('#chatBox').scrollTop($('#chatBox')[0].scrollHeight);
+            }
+        });
+    }
+
+    function logout() {
+        $.ajax({
+            url: '/logout',
+            type: 'GET',
+            success: function() {
+                window.location.href = "/login";
+            }
+        });
+    }
+
+    // Send message on pressing Enter
+    $('#userInput').keypress(function(event) {
+        if (event.which === 13) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+</script>
+
+</body>
+</html>
